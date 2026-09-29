@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تطبيق مسح وتتبع الباركود - Adrar Optic / Log</title>
-    <!-- Tailwind CSS للتنسيق السريع -->
+    <title>تتبع الباركود من Google Sheets</title>
+    <!-- Tailwind CSS للتنسيق -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- مكتبة قراءة الباركود عبر الكاميرا -->
     <script src="https://unpkg.com/html5-qrcode"></script>
@@ -21,9 +21,9 @@
 
     <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع ومسح باركود الطلبيات</h1>
-            <div class="mt-4 md:mt-0 flex gap-2">
-                <input type="file" id="csvFile" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود المرتبط بـ Google Sheets</h1>
+            <div class="mt-4 md:mt-0">
+                <button onclick="fetchGoogleSheetData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm">🔄 تحديث البيانات من جوجل شيت</button>
             </div>
         </header>
 
@@ -33,10 +33,10 @@
             <div class="bg-gray-50 p-4 rounded-lg border">
                 <label class="block text-sm font-medium text-gray-700 mb-2">🔍 أدخل أو امسح الكود (Barcode Scanner / يدوي):</label>
                 <div class="flex gap-2">
-                    <input type="text" id="searchInput" placeholder="مثال: SB07BD24T" class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="text5" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button onclick="searchBarcode()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">بحث وتلوين</button>
                 </div>
-                <p id="statusMsg" class="mt-2 text-sm text-gray-600"></p>
+                <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاري تحميل البيانات من جوجل شيت...</p>
             </div>
 
             <!-- تشغيل كاميرا الهاتف لمسح الباركود -->
@@ -52,64 +52,47 @@
             <table id="dataTable" class="min-w-full divide-y divide-gray-200 text-right">
                 <thead class="bg-gray-200 sticky top-0">
                     <tr id="tableHeader">
-                        <!-- يتم تعبئة العناوين تلقائياً -->
+                        <!-- عناوين الأعمدة -->
                     </tr>
                 </thead>
                 <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
-                    <!-- يتم تعبئة البيانات تلقائياً -->
+                    <!-- صفوف البيانات -->
                 </tbody>
             </table>
         </div>
     </div>
 
     <script>
+        // رابط جوجل شيت المنشور بصيغة CSV الذي قمت بإرفاقه
+        const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
+        
         let tableData = [];
         let headers = [];
 
-        // تحميل ملف CSV الافتراضي أو المرفق تلقائياً إذا وجد، أو انتظار رفع المستخدم
+        // تحميل البيانات تلقائياً عند فتح الصفحة
         window.addEventListener('DOMContentLoaded', () => {
-            // تحميل ملف افتراضي تجريبي من البيانات المرفقة
-            loadDefaultData();
+            fetchGoogleSheetData();
         });
 
-        function loadDefaultData() {
-            // بيانات تجريبية مطابقة لملف digylog_Reteur.csv المرفق
-            const sampleCSV = `Code,Ville,Statut,Raison,Date,Heure,Qte,D1,D2,D3,Note
-SB07BD24T,Tafraout,Annulée,Toujours injoignable,31/08/2026,01:00:00,4,32 days,14 days,Livraison automatique dans 1 jour,
-SB432680M,Mirleft,Refusée,Article différent a la présentation du site,18/09/2026,01:00:00,2,10 days,8 days,Livraison automatique dans 6 jours,
-S30E08D3M,Mirleft,Refusée,Mauvais qualité / Non conforme,22/09/2026,02:00:00,4,11 days,5 days,10 jours,
-FC3F9F03AL,Lakhssas,Annulée,Toujours injoignable,23/09/2026,11:30:00,4,12 days,5 days,10 jours,
-EC-SD027908T,Tiznit,Récupérée,,24/09/2026,14:51:00,2,3 days,3 days,12 days,`;
-            
-            parseAndDisplayCSV(sampleCSV);
-        }
+        function fetchGoogleSheetData() {
+            const msg = document.getElementById('statusMsg');
+            msg.innerText = "جاري جلب أحدث البيانات من Google Sheets...";
+            msg.className = "mt-2 text-sm text-blue-600 font-medium";
 
-        // رفع ملف CSV جديد
-        document.getElementById('csvFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                Papa.parse(file, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: function(results) {
-                        tableData = results.data;
-                        headers = results.meta.fields;
-                        renderTable(tableData, headers);
-                        document.getElementById('statusMsg').innerText = "تم تحميل الملف بنجاح!";
-                        document.getElementById('statusMsg').className = "mt-2 text-sm text-green-600 font-semibold";
-                    }
-                });
-            }
-        });
-
-        function parseAndDisplayCSV(csvText) {
-            Papa.parse(csvText, {
+            Papa.parse(sheetCSVUrl, {
+                download: true,
                 header: true,
                 skipEmptyLines: true,
                 complete: function(results) {
                     tableData = results.data;
                     headers = results.meta.fields;
                     renderTable(tableData, headers);
+                    msg.innerText = `تم جلب ${tableData.length} سجل بنجاح من جوجل شيت!`;
+                    msg.className = "mt-2 text-sm text-green-600 font-semibold";
+                },
+                error: function(err) {
+                    msg.innerText = "حدث خطأ أثناء الاتصال بجوجل شيت. تأكد من إذن النشر (Publish to Web).";
+                    msg.className = "mt-2 text-sm text-red-600 font-semibold";
                 }
             });
         }
@@ -145,7 +128,7 @@ EC-SD027908T,Tiznit,Récupérée,,24/09/2026,14:51:00,2,3 days,3 days,12 days,`;
             });
         }
 
-        // دالة البحث والتلوين للباركود
+        // دالة البحث والتلوين عند مسح الباركود أو الكتابة
         function searchBarcode() {
             const query = document.getElementById('searchInput').value.trim();
             const msg = document.getElementById('statusMsg');
@@ -156,13 +139,13 @@ EC-SD027908T,Tiznit,Récupérée,,24/09/2026,14:51:00,2,3 days,3 days,12 days,`;
                 return;
             }
 
-            // إزالة التلوين السابق
+            // إزالة التلوين السابق من كل السطور
             document.querySelectorAll('tr').forEach(tr => tr.classList.remove('highlight-row'));
 
             let foundIndex = -1;
             tableData.forEach((row, index) => {
-                // البحث في عمود Code (أو مطابقة تامة)
-                if (row['Code'] && row['Code'].toString().toLowerCase() === query.toLowerCase()) {
+                // البحث في عمود Code (أو مطابقة أي عمود يحتوي على الكود إذا أردت)
+                if (row['Code'] && row['Code'].toString().trim().toLowerCase() === query.toLowerCase()) {
                     foundIndex = index;
                 }
             });
@@ -172,23 +155,23 @@ EC-SD027908T,Tiznit,Récupérée,,24/09/2026,14:51:00,2,3 days,3 days,12 days,`;
                 if (targetRow) {
                     targetRow.classList.add('highlight-row');
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    msg.innerText = `تم العثور على الكود (${query}) وتلوين السطر بنجاح في الجدول!`;
+                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر رقم ${foundIndex + 1}!`;
                     msg.className = "mt-2 text-sm text-green-600 font-bold";
                 }
             } else {
-                msg.innerText = `عذراً، الكود (${query}) غير موجود في البيانات.`;
+                msg.innerText = `❌ عذراً، الكود (${query}) غير موجود في جدول جوجل شيت.`;
                 msg.className = "mt-2 text-sm text-red-600 font-bold";
             }
         }
 
-        // دعم الضغط على زر Enter في حقل البحث (مناسب لأجهزة قراءة الباركود السريعة)
+        // دعم الضغط على زر Enter (مخصص لأجهزة Scanner Gun)
         document.getElementById('searchInput').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 searchBarcode();
             }
         });
 
-        // تشغيل كاميرا الهاتف لمسح الباركود
+        // تشغيل الكاميرا لمسح الباركود
         function startScanner() {
             const readerDiv = document.getElementById('reader');
             readerDiv.style.display = 'block';
@@ -205,10 +188,10 @@ EC-SD027908T,Tiznit,Récupérée,,24/09/2026,14:51:00,2,3 days,3 days,12 days,`;
                     }).catch(err => console.log(err));
                 },
                 (errorMessage) => {
-                    // أخطاء المسح المؤقتة نتجاهلها لتجنب الإزعاج
+                    // الأخطاء المؤقتة للمسح يتم تجاوزها تلقائياً
                 }
             ).catch(err => {
-                alert("تعذر تشغيل الكاميرا. تأكد من إعطاء الصلاحيات اللازمة.");
+                alert("تعذر تشغيل الكاميرا. تأكد من إعطاء الصلاحيات لل متصفح.");
             });
         }
     </script>
