@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تتبع الباركود الذكي - مع الصوت والتلوين</title>
+    <title>تتبع الباركود المتزامن مع جوجل شيت</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         .highlight-row {
-            background-color: #fef08a !important; /* لون أصفر مميز محلياً */
+            background-color: #fef08a !important;
             transition: background-color 0.5s ease;
         }
     </style>
@@ -18,7 +18,7 @@
 
     <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود (مع التنبيه الصوتي والتزامن)</h1>
+            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود المتزامن (صوت + تلوين مباشر)</h1>
             <div class="mt-4 md:mt-0 flex gap-2">
                 <button onclick="fetchGoogleSheetData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm">🔄 تحديث البيانات</button>
             </div>
@@ -32,7 +32,7 @@
                     <input type="text" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button onclick="searchBarcode()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">بحث وتلوين</button>
                 </div>
-                <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاري تحميل البيانات من جوجل شيت...</p>
+                <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاري جلب البيانات والتزامن...</p>
             </div>
 
             <div class="bg-gray-50 p-4 rounded-lg border flex flex-col items-center">
@@ -56,6 +56,9 @@
     <script>
         const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
         
+        // رابط الـ Google Apps Script الخاص بك الذي أرفقته
+        const scriptURL = "https://script.google.com/macros/s/AKfycbz9HE6FI_vgOarJ8hvSMjgLslrn-_JXHEmONwPPyfmSBquCD9_KCAnnq6V4NCTOl11FAw/exec";
+        
         let tableData = [];
         let headers = [];
 
@@ -63,7 +66,7 @@
             fetchGoogleSheetData();
         });
 
-        // نظام توليد الأصوات (Web Audio API - بدون الحاجة لملفات خارجية)
+        // مولد الأصوات التنبيهية (Web Audio API)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playSound(type) {
@@ -76,7 +79,6 @@
             gainNode.connect(audioCtx.destination);
 
             if (type === 'success') {
-                // صوت نجاح (نغمة حادة ومبهجة)
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(600, audioCtx.currentTime);
                 osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.15);
@@ -85,7 +87,6 @@
                 osc.start();
                 osc.stop(audioCtx.currentTime + 0.3);
             } else {
-                // صوت خطأ (نغمة منخفضة وتحذيرية)
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(200, audioCtx.currentTime);
                 osc.frequency.setValueAtTime(150, audioCtx.currentTime + 0.1);
@@ -162,7 +163,7 @@
             document.querySelectorAll('tr').forEach(tr => tr.classList.remove('highlight-row'));
 
             let foundIndex = -1;
-            tableData.forEach((, index) => {
+            tableData.forEach((row, index) => {
                 if (row['Code'] && row['Code'].toString().trim().toLowerCase() === query.toLowerCase()) {
                     foundIndex = index;
                 }
@@ -173,21 +174,24 @@
                 if (targetRow) {
                     targetRow.classList.add('highlight-row');
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر رقم ${foundIndex + 1}!`;
+                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر محلياً وفياً في جوجل شيت!`;
                     msg.className = "mt-2 text-sm text-green-600 font-bold";
                     
-                    // تشغيل صوت النجاح
                     playSound('success');
+
+                    // إرسال طلب تلوين السطر إلى Google Apps Script الخاص بك في الخلفية
+                    fetch(`${scriptURL}?code=${encodeURIComponent(query)}`)
+                        .then(response => response.json())
+                        .then(data => console.log('تم التلوين في جوجل شيت بنجاح:', data))
+                        .catch(err => console.log('خطأ في الاتصال بالسكريبت:', err));
                 }
             } else {
                 msg.innerText = `❌ عذراً، الكود (${query}) غير موجود في جدول جوجل شيت.`;
                 msg.className = "mt-2 text-sm text-red-600 font-bold";
-                
-                // تشغيل صوت الخطأ
                 playSound('error');
             }
             
-            // تفريغ حقل الإدخال والاستعداد للمسح التالي (مهم جداً لجهاز الباركود السريع)
+            // إعادة ضبط حقل الإدخال لاستقبال الباركود التالي مباشرة
             const inputField = document.getElementById('searchInput');
             inputField.value = '';
             inputField.focus();
