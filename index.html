@@ -3,16 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تتبع الباركود من Google Sheets</title>
-    <!-- Tailwind CSS للتنسيق -->
+    <title>تتبع الباركود الذكي - مع الصوت والتلوين</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- مكتبة قراءة الباركود عبر الكاميرا -->
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <!-- مكتبة قراءة ملفات CSV -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
         .highlight-row {
-            background-color: #fef08a !important; /* لون أصفر مميز للسطر المطابق */
+            background-color: #fef08a !important; /* لون أصفر مميز محلياً */
             transition: background-color 0.5s ease;
         }
     </style>
@@ -21,25 +18,23 @@
 
     <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود المرتبط بـ Google Sheets</h1>
-            <div class="mt-4 md:mt-0">
-                <button onclick="fetchGoogleSheetData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm">🔄 تحديث البيانات من جوجل شيت</button>
+            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود (مع التنبيه الصوتي والتزامن)</h1>
+            <div class="mt-4 md:mt-0 flex gap-2">
+                <button onclick="fetchGoogleSheetData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm">🔄 تحديث البيانات</button>
             </div>
         </header>
 
         <!-- قسم البحث والمسح -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <!-- البحث اليدوي / جهاز الباركود -->
             <div class="bg-gray-50 p-4 rounded-lg border">
                 <label class="block text-sm font-medium text-gray-700 mb-2">🔍 أدخل أو امسح الكود (Barcode Scanner / يدوي):</label>
                 <div class="flex gap-2">
-                    <input type="text5" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <button onclick="searchBarcode()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">بحث وتلوين</button>
                 </div>
                 <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاري تحميل البيانات من جوجل شيت...</p>
             </div>
 
-            <!-- تشغيل كاميرا الهاتف لمسح الباركود -->
             <div class="bg-gray-50 p-4 rounded-lg border flex flex-col items-center">
                 <span class="text-sm font-medium text-gray-700 mb-2">📷 مسح الباركود بالكاميرا:</span>
                 <button onclick="startScanner()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm mb-2">فتح الكاميرا</button>
@@ -51,28 +46,55 @@
         <div class="overflow-x-auto border rounded-lg max-h-[500px]">
             <table id="dataTable" class="min-w-full divide-y divide-gray-200 text-right">
                 <thead class="bg-gray-200 sticky top-0">
-                    <tr id="tableHeader">
-                        <!-- عناوين الأعمدة -->
-                    </tr>
+                    <tr id="tableHeader"></tr>
                 </thead>
-                <tbody id="tableBody" class="bg-white divide-y divide-gray-200">
-                    <!-- صفوف البيانات -->
-                </tbody>
+                <tbody id="tableBody" class="bg-white divide-y divide-gray-200"></tbody>
             </table>
         </div>
     </div>
 
     <script>
-        // رابط جوجل شيت المنشور بصيغة CSV الذي قمت بإرفاقه
         const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
         
         let tableData = [];
         let headers = [];
 
-        // تحميل البيانات تلقائياً عند فتح الصفحة
         window.addEventListener('DOMContentLoaded', () => {
             fetchGoogleSheetData();
         });
+
+        // نظام توليد الأصوات (Web Audio API - بدون الحاجة لملفات خارجية)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'success') {
+                // صوت نجاح (نغمة حادة ومبهجة)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            } else {
+                // صوت خطأ (نغمة منخفضة وتحذيرية)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.3);
+            }
+        }
 
         function fetchGoogleSheetData() {
             const msg = document.getElementById('statusMsg');
@@ -91,7 +113,7 @@
                     msg.className = "mt-2 text-sm text-green-600 font-semibold";
                 },
                 error: function(err) {
-                    msg.innerText = "حدث خطأ أثناء الاتصال بجوجل شيت. تأكد من إذن النشر (Publish to Web).";
+                    msg.innerText = "حدث خطأ أثناء الاتصال بجوجل شيت.";
                     msg.className = "mt-2 text-sm text-red-600 font-semibold";
                 }
             });
@@ -104,7 +126,6 @@
             headerRow.innerHTML = '';
             tbody.innerHTML = '';
 
-            // إنشاء الأعمدة
             hdrs.forEach(h => {
                 const th = document.createElement('th');
                 th.className = "px-6 py-3 text-xs font-medium text-gray-700 uppercase tracking-wider";
@@ -112,7 +133,6 @@
                 headerRow.appendChild(th);
             });
 
-            // إنشاء الصفوف
             data.forEach((row, index) => {
                 const tr = document.createElement('tr');
                 tr.id = `row-${index}`;
@@ -128,7 +148,6 @@
             });
         }
 
-        // دالة البحث والتلوين عند مسح الباركود أو الكتابة
         function searchBarcode() {
             const query = document.getElementById('searchInput').value.trim();
             const msg = document.getElementById('statusMsg');
@@ -136,15 +155,14 @@
             if (!query) {
                 msg.innerText = "الرجاء إدخال أو مسح كود باركود أولاً.";
                 msg.className = "mt-2 text-sm text-red-600";
+                playSound('error');
                 return;
             }
 
-            // إزالة التلوين السابق من كل السطور
             document.querySelectorAll('tr').forEach(tr => tr.classList.remove('highlight-row'));
 
             let foundIndex = -1;
-            tableData.forEach((row, index) => {
-                // البحث في عمود Code (أو مطابقة أي عمود يحتوي على الكود إذا أردت)
+            tableData.forEach((, index) => {
                 if (row['Code'] && row['Code'].toString().trim().toLowerCase() === query.toLowerCase()) {
                     foundIndex = index;
                 }
@@ -157,21 +175,30 @@
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر رقم ${foundIndex + 1}!`;
                     msg.className = "mt-2 text-sm text-green-600 font-bold";
+                    
+                    // تشغيل صوت النجاح
+                    playSound('success');
                 }
             } else {
                 msg.innerText = `❌ عذراً، الكود (${query}) غير موجود في جدول جوجل شيت.`;
                 msg.className = "mt-2 text-sm text-red-600 font-bold";
+                
+                // تشغيل صوت الخطأ
+                playSound('error');
             }
+            
+            // تفريغ حقل الإدخال والاستعداد للمسح التالي (مهم جداً لجهاز الباركود السريع)
+            const inputField = document.getElementById('searchInput');
+            inputField.value = '';
+            inputField.focus();
         }
 
-        // دعم الضغط على زر Enter (مخصص لأجهزة Scanner Gun)
         document.getElementById('searchInput').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 searchBarcode();
             }
         });
 
-        // تشغيل الكاميرا لمسح الباركود
         function startScanner() {
             const readerDiv = document.getElementById('reader');
             readerDiv.style.display = 'block';
@@ -180,18 +207,16 @@
             html5QrCode.start(
                 { facingMode: "environment" },
                 { fps: 10, qrbox: { width: 250, height: 100 } },
-                (decodedText, decodedResult) => {
+                (decodedText) => {
                     document.getElementById('searchInput').value = decodedText;
                     searchBarcode();
                     html5QrCode.stop().then(() => {
                         readerDiv.style.display = 'none';
                     }).catch(err => console.log(err));
                 },
-                (errorMessage) => {
-                    // الأخطاء المؤقتة للمسح يتم تجاوزها تلقائياً
-                }
+                (errorMessage) => {}
             ).catch(err => {
-                alert("تعذر تشغيل الكاميرا. تأكد من إعطاء الصلاحيات لل متصفح.");
+                alert("تعذر تشغيل الكاميرا.");
             });
         }
     </script>
