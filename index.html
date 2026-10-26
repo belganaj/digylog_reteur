@@ -29,7 +29,7 @@
             <div class="bg-gray-50 p-4 rounded-lg border">
                 <label class="block text-sm font-medium text-gray-700 mb-2">🔍 أدخل أو امسح الكود (Barcode Scanner / يدوي):</label>
                 <div class="flex gap-2">
-                    <input type="text" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="text" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" autofocus>
                     <button onclick="searchBarcode()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">بحث وتلوين</button>
                 </div>
                 <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاري جلب البيانات والتزامن...</p>
@@ -55,8 +55,6 @@
 
     <script>
         const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
-        
-        // رابط الـ Google Apps Script الخاص بك الذي أرفقته
         const scriptURL = "https://script.google.com/macros/s/AKfycbz9HE6FI_vgOarJ8hvSMjgLslrn-_JXHEmONwPPyfmSBquCD9_KCAnnq6V4NCTOl11FAw/exec";
         
         let tableData = [];
@@ -164,7 +162,9 @@
 
             let foundIndex = -1;
             tableData.forEach((row, index) => {
-                if (row['Code'] && row['Code'].toString().trim().toLowerCase() === query.toLowerCase()) {
+                // البحث في عمود Code أو أية أعمدة محتملة تمثل الباركود
+                const codeVal = row['Code'] || row['code'] || row['الباركود'] || row['الكود'];
+                if (codeVal && codeVal.toString().trim().toLowerCase() === query.toLowerCase()) {
                     foundIndex = index;
                 }
             });
@@ -174,16 +174,15 @@
                 if (targetRow) {
                     targetRow.classList.add('highlight-row');
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر محلياً وفياً في جوجل شيت!`;
+                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر محلياً وفي جوجل شيت!`;
                     msg.className = "mt-2 text-sm text-green-600 font-bold";
                     
                     playSound('success');
 
-                    // إرسال طلب تلوين السطر إلى Google Apps Script الخاص بك في الخلفية
-                    fetch(`${scriptURL}?code=${encodeURIComponent(query)}`)
-                        .then(response => response.json())
-                        .then(data => console.log('تم التلوين في جوجل شيت بنجاح:', data))
-                        .catch(err => console.log('خطأ في الاتصال بالسكريبت:', err));
+                    // إرسال طلب تلوين السطر إلى Google Apps Script
+                    fetch(`${scriptURL}?code=${encodeURIComponent(query)}`, { mode: 'no-cors' })
+                        .then(() => console.log('تم إرسال طلب التلوين إلى Google Apps Script'))
+                        .catch(err => console.error('خطأ في الاتصال بالسكريبت:', err));
                 }
             } else {
                 msg.innerText = `❌ عذراً، الكود (${query}) غير موجود في جدول جوجل شيت.`;
