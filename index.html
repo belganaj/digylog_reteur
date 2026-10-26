@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- مكتبة قراءة ملفات Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         .highlight-row {
@@ -19,8 +20,9 @@
 
     <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود (رفع Excel + فحص وتلوين)</h1>
+            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود المتزامن (صوت + تلوين مباشر)</h1>
             <div class="mt-4 md:mt-0 flex flex-wrap gap-2 items-center">
+                <!-- زر رفع ملف Excel وتحديث digylog_Reteur -->
                 <label class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm cursor-pointer shadow">
                     📁 رفع ملف Excel (digylog_Reteur)
                     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
@@ -29,6 +31,7 @@
             </div>
         </header>
 
+        <!-- قسم البحث والمسح -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div class="bg-gray-50 p-4 rounded-lg border">
                 <label class="block text-sm font-medium text-gray-700 mb-2">🔍 أدخل أو امسح الكود (Barcode Scanner / يدوي):</label>
@@ -36,7 +39,7 @@
                     <input type="text" id="searchInput" placeholder="امسح الباركود هنا..." class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" autofocus>
                     <button onclick="searchBarcode()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium">بحث وتلوين</button>
                 </div>
-                <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاهز للاستخدام...</p>
+                <p id="statusMsg" class="mt-2 text-sm text-gray-600 font-medium">جاري جلب البيانات والتزامن...</p>
             </div>
 
             <div class="bg-gray-50 p-4 rounded-lg border flex flex-col items-center">
@@ -46,6 +49,7 @@
             </div>
         </div>
 
+        <!-- جدول البيانات -->
         <div class="overflow-x-auto border rounded-lg max-h-[500px]">
             <table id="dataTable" class="min-w-full divide-y divide-gray-200 text-right">
                 <thead class="bg-gray-200 sticky top-0">
@@ -57,8 +61,8 @@
     </div>
 
     <script>
-        const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
-        const scriptURL = "https://script.google.com/macros/s/AKfycbz9HE6FI_vgOarJ8hvSMjgLslrn-_JXHEmONwPPyfmSBquCD9_KCAnnq6V4NCTOl11FAw/exec";
+        const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/1oTJiHgl2zytYAENV1Dp_b7_O_R_s9eSUPq9yPpOqF9U/edit?usp=sharing";
+        const scriptURL = "https://script.google.com/macros/s/AKfycbwBWRXn2-HpFobnz-94Ha1fqpscp6K8Wk4f7uT35xxl-CTrjw9unNpV3x4peqM130Hs/exec";
         
         let tableData = [];
         let headers = [];
@@ -67,10 +71,13 @@
             fetchGoogleSheetData();
         });
 
+        // مولد الأصوات التنبيهية (Web Audio API)
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
         function playSound(type) {
-            if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
             osc.connect(gainNode);
@@ -108,7 +115,7 @@
                     tableData = results.data;
                     headers = results.meta.fields;
                     renderTable(tableData, headers);
-                    msg.innerText = `تم جلب ${tableData.length} سجل بنجاح!`;
+                    msg.innerText = `تم جلب ${tableData.length} سجل بنجاح من جوجل شيت!`;
                     msg.className = "mt-2 text-sm text-green-600 font-semibold";
                 },
                 error: function(err) {
@@ -118,12 +125,13 @@
             });
         }
 
+        // دالة قراءة ملف الـ Excel ورفع بياناته
         function handleExcelUpload(event) {
             const file = event.target.files[0];
             const msg = document.getElementById('statusMsg');
             if (!file) return;
 
-            msg.innerText = "جاري قراءة ملف Excel ورفعه إلى جوجل شيت...";
+            msg.innerText = "جاري قراءة ملف Excel ورفع البيانات إلى جوجل شيت...";
             msg.className = "mt-2 text-sm text-indigo-600 font-medium";
 
             const reader = new FileReader();
@@ -136,39 +144,42 @@
                     const jsonRows = XLSX.utils.sheet_to_json(worksheet);
 
                     if (jsonRows.length === 0) {
-                        alert("الملف فارغ أو لا يحتوي على بيانات.");
+                        alert("الملف فارغ أو لا يحتوي على بيانات صحيحة.");
                         return;
                     }
 
-                    // عرض البيانات محلياً فوراً للسرعة
+                    // تحديث الجدول المحلي فوراً
                     headers = Object.keys(jsonRows[0]);
                     tableData = jsonRows;
                     renderTable(tableData, headers);
 
-                    // إرسال البيانات إلى Google Apps Script
+                    msg.innerText = `تم قراءة ${jsonRows.length} صف من الملف بنجاح. جاري المزامنة مع Google Sheet (digylog_Reteur)...`;
+                    playSound('success');
+
+                    // إرسال البيانات إلى Google Apps Script لحفظها في ملف digylog_Reteur
                     fetch(scriptURL, {
                         method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
                         body: JSON.stringify({
                             action: "uploadExcel",
                             sheetName: "digylog_Reteur",
                             rows: jsonRows
                         })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        msg.innerText = `✨ تم رفع الملف إلى جوجل شيت (digylog_Reteur) بنجاح!`;
+                    }).then(() => {
+                        msg.innerText = `✨ تم رفع وتحديث ملف (digylog_Reteur) في جوجل شيت بنجاح!`;
                         msg.className = "mt-2 text-sm text-green-600 font-bold";
-                        playSound('success');
-                    })
-                    .catch(err => {
+                    }).catch(err => {
                         console.error(err);
-                        msg.innerText = "تم عرض البيانات محلياً (تأكد من نشر السكريبت كـ Web App بصلاحية Anyone).";
-                        msg.className = "mt-2 text-sm text-amber-600 font-bold";
+                        msg.innerText = "حدث خطأ أثناء إرسال البيانات لجوجل شيت.";
+                        msg.className = "mt-2 text-sm text-red-600 font-bold";
                     });
 
                 } catch (error) {
                     console.error(error);
-                    msg.innerText = "خطأ في قراءة ملف الـ Excel.";
+                    msg.innerText = "حدث خطأ أثناء قراءة ملف الـ Excel.";
                     msg.className = "mt-2 text-sm text-red-600 font-bold";
                     playSound('error');
                 }
@@ -233,16 +244,17 @@
                 if (targetRow) {
                     targetRow.classList.add('highlight-row');
                     targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر!`;
+                    msg.innerText = `✨ تم العثور على الكود (${query}) وتلوين السطر محلياً وفي جوجل شيت!`;
                     msg.className = "mt-2 text-sm text-green-600 font-bold";
                     
                     playSound('success');
 
-                    fetch(`${scriptURL}?code=${encodeURIComponent(query)}`)
-                        .catch(err => console.error(err));
+                    fetch(`${scriptURL}?code=${encodeURIComponent(query)}`, { mode: 'no-cors' })
+                        .then(() => console.log('تم إرسال طلب التلوين إلى Google Apps Script'))
+                        .catch(err => console.error('خطأ في الاتصال بالسكريبت:', err));
                 }
             } else {
-                msg.innerText = `❌ عذراً، الكود (${query}) غير موجود.`;
+                msg.innerText = `❌ عذراً، الكود (${query}) غير موجود في جدول جوجل شيت.`;
                 msg.className = "mt-2 text-sm text-red-600 font-bold";
                 playSound('error');
             }
