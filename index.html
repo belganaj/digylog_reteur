@@ -20,11 +20,11 @@
 
     <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
-            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود المتزامن (صوت + تلوين مباشر)</h1>
+            <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود (رفع Excel + فحص وتلوين)</h1>
             <div class="mt-4 md:mt-0 flex flex-wrap gap-2 items-center">
                 <!-- زر رفع ملف Excel وتحديث digylog_Reteur -->
                 <label class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm cursor-pointer shadow">
-                    📁 رفع ملف Excel (digylog_Reteur)
+                    📁 رفع ملف Excel إلى (digylog_Reteur)
                     <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
                 </label>
                 <button onclick="fetchGoogleSheetData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm">🔄 تحديث البيانات</button>
@@ -61,6 +61,7 @@
     </div>
 
     <script>
+        // رابط الـ CSV لجوجل شيت (تأكد أنه يعرض بيانات الورقة المطلوبة digylog_Reteur أو الشيت الحالي)
         const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
         const scriptURL = "https://script.google.com/macros/s/AKfycbz9HE6FI_vgOarJ8hvSMjgLslrn-_JXHEmONwPPyfmSBquCD9_KCAnnq6V4NCTOl11FAw/exec";
         
@@ -125,13 +126,13 @@
             });
         }
 
-        // دالة قراءة ملف الـ Excel ورفع بياناته
+        // دالة قراءة ملف الـ Excel ورفع بياناته لجوجل شيت أولاً
         function handleExcelUpload(event) {
             const file = event.target.files[0];
             const msg = document.getElementById('statusMsg');
             if (!file) return;
 
-            msg.innerText = "جاري قراءة ملف Excel ورفع البيانات إلى جوجل شيت...";
+            msg.innerText = "جاري قراءة ملف Excel ورفعه إلى جوجل شيت (digylog_Reteur)...";
             msg.className = "mt-2 text-sm text-indigo-600 font-medium";
 
             const reader = new FileReader();
@@ -148,15 +149,7 @@
                         return;
                     }
 
-                    // تحديث الجدول المحلي فوراً
-                    headers = Object.keys(jsonRows[0]);
-                    tableData = jsonRows;
-                    renderTable(tableData, headers);
-
-                    msg.innerText = `تم قراءة ${jsonRows.length} صف من الملف بنجاح. جاري المزامنة مع Google Sheet (digylog_Reteur)...`;
-                    playSound('success');
-
-                    // إرسال البيانات إلى Google Apps Script لحفظها في ملف digylog_Reteur
+                    // إرسال البيانات إلى Google Apps Script لحفظها في شيت digylog_Reteur
                     fetch(scriptURL, {
                         method: 'POST',
                         mode: 'no-cors',
@@ -169,12 +162,20 @@
                             rows: jsonRows
                         })
                     }).then(() => {
-                        msg.innerText = `✨ تم رفع وتحديث ملف (digylog_Reteur) في جوجل شيت بنجاح!`;
+                        msg.innerText = `✨ تم رفع الملف إلى جوجل شيت بنجاح! جاري تحديث الجدول...`;
                         msg.className = "mt-2 text-sm text-green-600 font-bold";
+                        playSound('success');
+
+                        // الانتظار قليلاً ثم جلب البيانات المحدثة مباشرة من جوجل شيت لضمان التطابق
+                        setTimeout(() => {
+                            fetchGoogleSheetData();
+                        }, 2000);
+
                     }).catch(err => {
                         console.error(err);
                         msg.innerText = "حدث خطأ أثناء إرسال البيانات لجوجل شيت.";
                         msg.className = "mt-2 text-sm text-red-600 font-bold";
+                        playSound('error');
                     });
 
                 } catch (error) {
@@ -249,6 +250,7 @@
                     
                     playSound('success');
 
+                    // إرسال طلب تلوين السطر إلى Google Apps Script
                     fetch(`${scriptURL}?code=${encodeURIComponent(query)}`, { mode: 'no-cors' })
                         .then(() => console.log('تم إرسال طلب التلوين إلى Google Apps Script'))
                         .catch(err => console.error('خطأ في الاتصال بالسكريبت:', err));
