@@ -7,8 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- مكتبة قراءة ملفات Excel -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         .highlight-row {
             background-color: #fef08a !important;
@@ -21,12 +19,7 @@
     <div class="max-w-7xl mx-auto bg-white shadow-lg rounded-xl p-6">
         <header class="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4">
             <h1 class="text-2xl font-bold text-gray-800">📦 نظام تتبع الباركود المتزامن (صوت + تلوين مباشر)</h1>
-            <div class="mt-4 md:mt-0 flex flex-wrap gap-2 items-center">
-                <!-- زر رفع ملف Excel وتحديث digylog_Reteur -->
-                <label class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 font-medium text-sm cursor-pointer shadow">
-                    📁 رفع ملف Excel (digylog_Reteur)
-                    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleExcelUpload(event)">
-                </label>
+            <div class="mt-4 md:mt-0 flex gap-2">
                 <button onclick="fetchGoogleSheetData()" class="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 font-medium text-sm">🔄 تحديث البيانات</button>
             </div>
         </header>
@@ -61,8 +54,8 @@
     </div>
 
     <script>
-        const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/1oTJiHgl2zytYAENV1Dp_b7_O_R_s9eSUPq9yPpOqF9U/edit?usp=sharing";
-        const scriptURL = "https://script.google.com/macros/s/AKfycbwBWRXn2-HpFobnz-94Ha1fqpscp6K8Wk4f7uT35xxl-CTrjw9unNpV3x4peqM130Hs/exec";
+        const sheetCSVUrl = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKtxEDlWSOouyNRAYvo_c4TVRf7IUa0KqoOtTrRcnFodzF3npXefxZDB5DVuZ64Oa28py5RHfnN5Rz/pub?output=csv";
+        const scriptURL = "https://script.google.com/macros/s/AKfycbz9HE6FI_vgOarJ8hvSMjgLslrn-_JXHEmONwPPyfmSBquCD9_KCAnnq6V4NCTOl11FAw/exec";
         
         let tableData = [];
         let headers = [];
@@ -125,68 +118,6 @@
             });
         }
 
-        // دالة قراءة ملف الـ Excel ورفع بياناته
-        function handleExcelUpload(event) {
-            const file = event.target.files[0];
-            const msg = document.getElementById('statusMsg');
-            if (!file) return;
-
-            msg.innerText = "جاري قراءة ملف Excel ورفع البيانات إلى جوجل شيت...";
-            msg.className = "mt-2 text-sm text-indigo-600 font-medium";
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    const jsonRows = XLSX.utils.sheet_to_json(worksheet);
-
-                    if (jsonRows.length === 0) {
-                        alert("الملف فارغ أو لا يحتوي على بيانات صحيحة.");
-                        return;
-                    }
-
-                    // تحديث الجدول المحلي فوراً
-                    headers = Object.keys(jsonRows[0]);
-                    tableData = jsonRows;
-                    renderTable(tableData, headers);
-
-                    msg.innerText = `تم قراءة ${jsonRows.length} صف من الملف بنجاح. جاري المزامنة مع Google Sheet (digylog_Reteur)...`;
-                    playSound('success');
-
-                    // إرسال البيانات إلى Google Apps Script لحفظها في ملف digylog_Reteur
-                    fetch(scriptURL, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            action: "uploadExcel",
-                            sheetName: "digylog_Reteur",
-                            rows: jsonRows
-                        })
-                    }).then(() => {
-                        msg.innerText = `✨ تم رفع وتحديث ملف (digylog_Reteur) في جوجل شيت بنجاح!`;
-                        msg.className = "mt-2 text-sm text-green-600 font-bold";
-                    }).catch(err => {
-                        console.error(err);
-                        msg.innerText = "حدث خطأ أثناء إرسال البيانات لجوجل شيت.";
-                        msg.className = "mt-2 text-sm text-red-600 font-bold";
-                    });
-
-                } catch (error) {
-                    console.error(error);
-                    msg.innerText = "حدث خطأ أثناء قراءة ملف الـ Excel.";
-                    msg.className = "mt-2 text-sm text-red-600 font-bold";
-                    playSound('error');
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-
         function renderTable(data, hdrs) {
             const headerRow = document.getElementById('tableHeader');
             const tbody = document.getElementById('tableBody');
@@ -231,11 +162,10 @@
 
             let foundIndex = -1;
             tableData.forEach((row, index) => {
-                for (let key in row) {
-                    if (row[key] && row[key].toString().trim().toLowerCase() === query.toLowerCase()) {
-                        foundIndex = index;
-                        break;
-                    }
+                // البحث في عمود Code أو أية أعمدة محتملة تمثل الباركود
+                const codeVal = row['Code'] || row['code'] || row['الباركود'] || row['الكود'];
+                if (codeVal && codeVal.toString().trim().toLowerCase() === query.toLowerCase()) {
+                    foundIndex = index;
                 }
             });
 
@@ -249,6 +179,7 @@
                     
                     playSound('success');
 
+                    // إرسال طلب تلوين السطر إلى Google Apps Script
                     fetch(`${scriptURL}?code=${encodeURIComponent(query)}`, { mode: 'no-cors' })
                         .then(() => console.log('تم إرسال طلب التلوين إلى Google Apps Script'))
                         .catch(err => console.error('خطأ في الاتصال بالسكريبت:', err));
@@ -259,6 +190,7 @@
                 playSound('error');
             }
             
+            // إعادة ضبط حقل الإدخال لاستقبال الباركود التالي مباشرة
             const inputField = document.getElementById('searchInput');
             inputField.value = '';
             inputField.focus();
